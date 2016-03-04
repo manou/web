@@ -1,6 +1,6 @@
 <?php
 /**
- * Chat services to manage a chat with a WebSocket server
+ * Chat application to manage a chat with a WebSocket server
  *
  * @category WebSocket service
  * @author   Romain Laneuville <romain.laneuville@hotmail.fr>
@@ -8,27 +8,26 @@
 
 namespace classes\websocket\services;
 
-use \classes\websocket\Server as Server;
 use \interfaces\ServiceInterface as Service;
+use classes\websocket\ServicesDispatcher as ServicesDispatcher;
+use Icicle\Log\{Log, function log};
 use \classes\IniManager as Ini;
 use \classes\entities\User as User;
 use \classes\entities\UsersChatRights as UsersChatRights;
 use \classes\entitiesManager\UserEntityManager as UserEntityManager;
 use \classes\entitiesManager\UsersChatRightsEntityManager as UsersChatRightsEntityManager;
+use Icicle\WebSocket\Connection as Connection;
 
 /**
  * Chat services to manage a chat with a WebSocket server
  *
- * @todo       Sonar this class
+ * @todo       Refacto all this class with Icicle lib [in progress]
  */
-class ChatService extends Server implements Service
+class ChatService extends ServicesDispatcher implements Service
 {
     use \traits\ShortcutsTrait;
+    use \traits\PrettyOutputTrait;
 
-    /**
-     * @var        string  $serverAddress   The server adress to connect
-     */
-    private $serverAddress;
     /**
      * @var        string  $chatService     The chat service name
      */
@@ -94,34 +93,35 @@ class ChatService extends Server implements Service
     /**
      * Constructor that sets the WebSocket server adress and create en empty default room
      *
-     * @param      string  $serverAddress  The WebSocket server adress
+     * @todo refacto
      */
-    public function __construct(string $serverAddress)
+    public function __construct(Log $log = null)
     {
-        Ini::setIniFileName(Ini::INI_CONF_FILE);
-        $params                   = Ini::getSectionParams('Chat service');
-        $this->serverKey          = Ini::getParam('Socket', 'serverKey');
-        $this->serverAddress      = $serverAddress;
-        $this->chatService        = $params['serviceName'];
-        $this->savingDir          = $params['savingDir'];
-        $this->maxMessagesPerFile = $params['maxMessagesPerFile'];
-        $this->roomsNamePath      = $this->savingDir . DIRECTORY_SEPARATOR . 'rooms_name';
-        $this->roomsName          = $this->getRoomsName();
+        $this->clientShare = shmop_open(1, 'a', 0644, 2048);
+        $this->log = $log ?: log();
+        // Ini::setIniFileName(Ini::INI_CONF_FILE);
+        // $params                   = Ini::getSectionParams('Chat service');
+        // $this->serverKey          = Ini::getParam('Socket', 'serverKey');
+        // $this->chatService        = $params['serviceName'];
+        // $this->savingDir          = $params['savingDir'];
+        // $this->maxMessagesPerFile = $params['maxMessagesPerFile'];
+        // $this->roomsNamePath      = $this->savingDir . DIRECTORY_SEPARATOR . 'rooms_name';
+        // $this->roomsName          = $this->getRoomsName();
 
-        // Create the default room
-        $this->rooms['default'] = array(
-            'sockets'      => array(),
-            'pseudonyms'   => array(),
-            'usersRights'  => array(),
-            'type'         => 'public',
-            'password'     => '',
-            'creationDate' => new \DateTime(),
-            'maxUsers'     => $params['maxUsers'],
-            'usersBanned'  => array(),
-            'historic'     => array('part' => 0, 'conversations' => array())
-        );
+        // // Create the default room
+        // $this->rooms['default'] = array(
+        //     'sockets'      => array(),
+        //     'pseudonyms'   => array(),
+        //     'usersRights'  => array(),
+        //     'type'         => 'public',
+        //     'password'     => '',
+        //     'creationDate' => new \DateTime(),
+        //     'maxUsers'     => $params['maxUsers'],
+        //     'usersBanned'  => array(),
+        //     'historic'     => array('part' => 0, 'conversations' => array())
+        // );
 
-        $this->loadHistoric('default', $this->getLastPartNumber('default'));
+        // $this->loadHistoric('default', $this->getLastPartNumber('default'));
     }
 
     /*=====  End of Magic methods  ======*/
@@ -133,10 +133,10 @@ class ChatService extends Server implements Service
     /**
      * Method to recieves data from the WebSocket server
      *
-     * @param      resource  $socket  The client socket
-     * @param      array     $data    JSON decoded client data
+     * @param      array       $data        JSON decoded client data
+     * @param      Connection  $connection  The user Connection object
      */
-    public function service($socket, array $data)
+    public function process(array $data, Connection $connection)
     {
         switch ($data['action']) {
             case $this->serverKey . 'disconnect':
@@ -146,63 +146,63 @@ class ChatService extends Server implements Service
                 break;
 
             case 'sendMessage':
-                $this->sendMessage($socket, $data);
+                $this->sendMessage($connection, $data);
 
                 break;
 
             case 'connectRoom':
-                $this->connectUser($socket, $data);
+                $this->connectUser($connection, $data);
 
                 break;
 
             case 'disconnect':
-                $this->disconnectUser($socket);
+                $this->disconnectUser($connection);
 
                 break;
 
             case 'disconnectFromRoom':
-                $this->disconnectUserFromRoom($socket, $data);
+                $this->disconnectUserFromRoom($connection, $data);
 
                 break;
 
             case 'createRoom':
-                $this->createRoom($socket, $data);
+                $this->createRoom($connection, $data);
 
                 break;
 
             case 'getHistoric':
-                $this->getHistoric($socket, $data);
+                $this->getHistoric($connection, $data);
 
                 break;
 
             case 'kickUser':
-                $this->kickUser($socket, $data);
+                $this->kickUser($connection, $data);
 
                 break;
 
             case 'banUser':
-                $this->banUser($socket, $data);
+                $this->banUser($connection, $data);
 
                 break;
 
             case 'updateRoomUserRight':
-                $this->updateRoomUserRight($socket, $data);
+                $this->updateRoomUserRight($connection, $data);
 
                 break;
 
             case 'setRoomInfo':
-                $this->setRoomInfo($socket, $data);
+                $this->setRoomInfo($connection, $data);
 
                 break;
 
             case 'getRoomsInfo':
-                $this->getRoomsInfo($socket, $data);
+                $this->getRoomsInfo($connection, $data);
 
                 break;
 
             default:
                 $this->send(
-                    $socket,
+                    $connection,
                     $this->encode(
                         json_encode(
                             array(
@@ -222,114 +222,23 @@ class ChatService extends Server implements Service
     =            Private methods            =
     =======================================*/
 
-    /**
-     * Create a chat room by an authenticated user request
-     *
-     * @param      resource  $socket  The user socket
-     * @param      array     $data    JSON decoded client data
-     */
-    private function createRoom($socket, array $data)
+    public function testClassAttributeSync()
     {
-        $success = false;
-        @$this->setIfIsSet($password, $data['password'], null);
-        @$this->setIfIsSet($roomPassword, $data['roomPassword'], null);
-        @$this->setIfIsSetAndTrim($roomName, $data['roomName'], null);
-        @$this->setIfIsSetAndTrim($login, $data['login'], null);
-        @$this->setIfIsSetAndTrim($type, $data['type'], null);
-        @$this->setIfIsSetAndTrim($maxUsers, $data['maxUsers'], null);
-
-        if ($roomName === null || $roomName === '') {
-            $message = _('The room name is required');
-        } elseif (in_array($roomName, $this->roomsName)) {
-            $message = sprintf(_('The chat room name "%s" already exists'), $roomName);
-        } elseif ($type !== 'public' && $type !== 'private') {
-            $message = _('The room type must be "public" or "private"');
-        } elseif ($type === 'private' && ($password === null || strlen($password) === 0)) {
-            $message = _('The password is required and must not be empty');
-        } elseif (!is_numeric($maxUsers) || $maxUsers < 2) {
-            $message = _('The max number of users must be a number and must no be less than 2');
-        } else {
-            $userEntityManager = new UserEntityManager();
-            $user              = $userEntityManager->authenticateUser($login, $password);
-
-            if ($user === false) {
-                $message = _('Authentication failed');
-            } else {
-                $usersChatRights              = new UsersChatRights();
-                $usersChatRightsEntityManager = new UsersChatRightsEntityManager($usersChatRights);
-                $usersChatRights->idUser      = $user->id;
-                $usersChatRights->roomName    = $roomName;
-                $usersChatRightsEntityManager->addRoomName($roomName);
-                $usersChatRightsEntityManager->grantAll();
-
-                $socketHash             = $this->getClientName($socket);
-                $pseudonym              = $userEntityManager->getPseudonymForChat();
-                $this->roomsName[]      = $roomName;
-                $this->rooms[$roomName] = array(
-                    'sockets'      => array($socketHash => $socket),
-                    'pseudonyms'   => array($socketHash => $pseudonym),
-                    'usersRights'  => array(),
-                    'creator'      => $user->email,
-                    'type'         => $type,
-                    'password'     => $roomPassword,
-                    'creationDate' => new \DateTime(),
-                    'maxUsers'     => $maxUsers,
-                    'usersBanned'  => array(),
-                    'historic'     => array('part' => 0, 'conversations' => array())
-                );
-
-                mkdir(stream_resolve_include_path($this->savingDir) . DIRECTORY_SEPARATOR . $roomName);
-                $this->addUserRoom($socketHash, $roomName);
-                $this->setRoomsName();
-                $this->setLastPartNumber($roomName, 0);
-                $this->saveRoom($roomName);
-
-                $success = true;
-                $message = sprintf(_('The chat room name "%s" is successfully created !'), $roomName);
-                $this->log(
-                    sprintf(
-                        _('[chatService] New room added "%s" (%s) maxUsers = %s and password = "%s" by %s'),
-                        $roomName,
-                        $type,
-                        $maxUsers,
-                        $roomPassword,
-                        $pseudonym
-                    )
-                );
-            }
-        }
-
-        $this->send(
-            $socket,
-            $this->encode(
-                json_encode(
-                    array(
-                    'service'  => $this->chatService,
-                    'action'   => 'createRoom',
-                    'success'  => $success,
-                    'roomName' => $roomName,
-                    'type'     => $type,
-                    'maxUsers' => $maxUsers,
-                    'password' => $roomPassword,
-                    'text'     => $message
-                    )
-                )
-            )
-        );
+        $data = unserialize(shmop_read($this->clientShare, 0, 2048), array('allowed_classes' => true));
+        yield $this->log->log(Log::INFO, 'Clients: %s', $this->formatVariable($data));
     }
 
     /**
      * Connect a user to one chat room as a registered or a guest user
      *
-     * @param      resource  $socket  The user socket
-     * @param      array     $data    JSON decoded client data
+     * @param      Connection  $connection  The user connection
+     * @param      array       $data        JSON decoded client data
      */
-    private function connectUser($socket, array $data)
+    private function connectUser(Connection $connection, array $data)
     {
         $success  = false;
         $user     = false;
         $response = array();
-        @$this->setIfIsSet($password, $data['user']['password'], null);
         @$this->setIfIsSet($roomPassword, $data['password'], null);
         @$this->setIfIsSetAndTrim($roomName, $data['roomName'], null);
         @$this->setIfIsSetAndTrim($email, $data['user']['email'], null);
@@ -418,6 +327,99 @@ class ChatService extends Server implements Service
                         'success' => $success,
                         'text'    => $message
                         )
+                    )
+                )
+            )
+        );
+    }
+
+    /**
+     * Create a chat room by an authenticated user request
+     *
+     * @param      Connection  $connection  The user connection
+     * @param      array       $data        JSON decoded client data
+     *
+     * @todo refacto
+     */
+    private function createRoom(Connection $connection, array $data)
+    {
+        $success = false;
+        @$this->setIfIsSet($roomPassword, $data['roomPassword'], null);
+        @$this->setIfIsSetAndTrim($roomName, $data['roomName'], null);
+        @$this->setIfIsSetAndTrim($type, $data['type'], null);
+        @$this->setIfIsSetAndTrim($maxUsers, $data['maxUsers'], null);
+
+        if ($roomName === null || $roomName === '') {
+            $message = _('The room name is required');
+        } elseif (in_array($roomName, $this->roomsName)) {
+            $message = sprintf(_('The chat room name "%s" already exists'), $roomName);
+        } elseif ($type !== 'public' && $type !== 'private') {
+            $message = _('The room type must be "public" or "private"');
+        } elseif ($type === 'private' && ($roomPassword === null || strlen($roomPassword) === 0)) {
+            $message = _('The password is required and must not be empty');
+        } elseif (!is_numeric($maxUsers) || $maxUsers < 2) {
+            $message = _('The max number of users must be a number and must no be less than 2');
+        } else {
+            if ($user === false) {
+                $message = _('Authentication failed');
+            } else {
+                $usersChatRights              = new UsersChatRights();
+                $usersChatRightsEntityManager = new UsersChatRightsEntityManager($usersChatRights);
+                $usersChatRights->idUser      = $user->id;
+                $usersChatRights->roomName    = $roomName;
+                $usersChatRightsEntityManager->addRoomName($roomName);
+                $usersChatRightsEntityManager->grantAll();
+
+                $socketHash             = $this->getClientName($socket);
+                $pseudonym              = $userEntityManager->getPseudonymForChat();
+                $this->roomsName[]      = $roomName;
+                $this->rooms[$roomName] = array(
+                    'sockets'      => array($socketHash => $socket),
+                    'pseudonyms'   => array($socketHash => $pseudonym),
+                    'usersRights'  => array(),
+                    'creator'      => $user->email,
+                    'type'         => $type,
+                    'password'     => $roomPassword,
+                    'creationDate' => new \DateTime(),
+                    'maxUsers'     => $maxUsers,
+                    'usersBanned'  => array(),
+                    'historic'     => array('part' => 0, 'conversations' => array())
+                );
+
+                mkdir(stream_resolve_include_path($this->savingDir) . DIRECTORY_SEPARATOR . $roomName);
+                $this->addUserRoom($socketHash, $roomName);
+                $this->setRoomsName();
+                $this->setLastPartNumber($roomName, 0);
+                $this->saveRoom($roomName);
+
+                $success = true;
+                $message = sprintf(_('The chat room name "%s" is successfully created !'), $roomName);
+                $this->log(
+                    sprintf(
+                        _('[chatService] New room added "%s" (%s) maxUsers = %s and password = "%s" by %s'),
+                        $roomName,
+                        $type,
+                        $maxUsers,
+                        $roomPassword,
+                        $pseudonym
+                    )
+                );
+            }
+        }
+
+        $this->send(
+            $socket,
+            $this->encode(
+                json_encode(
+                    array(
+                    'service'  => $this->chatService,
+                    'action'   => 'createRoom',
+                    'success'  => $success,
+                    'roomName' => $roomName,
+                    'type'     => $type,
+                    'maxUsers' => $maxUsers,
+                    'password' => $roomPassword,
+                    'text'     => $message
                     )
                 )
             )
@@ -1545,19 +1547,6 @@ class ChatService extends Server implements Service
     private function setRoomsName()
     {
         file_put_contents($this->roomsNamePath, json_encode($this->roomsName), FILE_USE_INCLUDE_PATH);
-    }
-
-    /**
-     * Log a message to the server if verbose mode is activated
-     *
-     * @param      string  $message  The message to output
-     */
-    private function log(string $message)
-    {
-        $serverSocket = stream_socket_client($this->serverAddress);
-        Ini::setIniFileName(Ini::INI_CONF_FILE);
-        $this->send($serverSocket, Ini::getParam('Socket', 'serviceKey') . $message);
-        fclose($serverSocket);
     }
 
     /*=====  End of Private methods  ======*/

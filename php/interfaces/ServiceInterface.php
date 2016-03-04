@@ -7,6 +7,8 @@
  */
 namespace interfaces;
 
+use Icicle\WebSocket\Connection as Connection;
+
 /**
  * Service interface to normalize WebSocket protocole services
  */
@@ -15,8 +17,8 @@ interface ServiceInterface
     /**
      * Method to recieves data from the WebSocket server
      *
-     * @param      resource  $socket  The client socket
-     * @param      array     $data    JSON decoded client data
+     * @param      array       $data        JSON decoded client data
+     * @param      Connection  $connection  The user Connection object
      */
-    public function service($socket, array $data);
+    public function process(array $data, Connection $connection);
 }

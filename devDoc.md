@@ -150,6 +150,8 @@ In php.ini, check thoses values
 
 - `extension=php_sockets.dll`
 
+- `extension=php_shmop.dll`
+
 In project /php folder create a `conf.ini` based on `con-example.ini`
 
 Install dev dependencies with Composer (on /php PATH run `composer install`)

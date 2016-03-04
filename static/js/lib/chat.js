@@ -697,11 +697,9 @@ define([
             this.websocket.send(JSON.stringify({
                 "service"     : [this.settings.serviceName],
                 "action"      : "createRoom",
-                "login"       : this.user.getEmail(),
-                "password"    : this.user.getPassword(),
                 "roomName"    : roomName,
-                "type"        : type,
                 "roomPassword": password,
+                "type"        : type,
                 "maxUsers"    : maxUsers
             }));
         },
