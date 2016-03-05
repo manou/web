@@ -2,8 +2,8 @@
     "minimum-stability": "dev",
     "require": {
         "elasticsearch/elasticsearch": "~2.0",
-        "icicleio/websocket": "*"
-        // "icicleio/concurrent": "*" => Icicle\Concurrent\Sync\PosixSemaphore requires the sysvmsg extension
+        "icicleio/websocket": "*",
+        "icicleio/stream": "*"
     },
     "require-dev": {
         "phpdocumentor/phpdocumentor": "2.8.5",

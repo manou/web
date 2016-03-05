@@ -8,7 +8,8 @@ use Icicle\Log\{Log, function log};
 use Icicle\Socket\Socket;
 use Icicle\WebSocket\Application as Application;
 use Icicle\WebSocket\Connection;
-// use Icicle\Concurrent\Sync\SharedMemoryParcel as SharedMemoryParcel; => Icicle\Concurrent\Sync\PosixSemaphore requires the sysvmsg extension
+use Icicle\Stream\DuplexStream;
+use Icicle\Stream\MemoryStream;
 use classes\entities\User as User;
 use classes\websocket\services\ChatService as ChatService;
 
@@ -21,29 +22,28 @@ class ServicesDispatcher implements Application
      */
     private $services;
     /**
-     * @var \Icicle\Log\Log
+     * @var $log \Icicle\Log\Log
      */
     private $log;
     /**
      * @var $clients array The clients pool
      */
-    private $clients;
-    protected $clientShare;
+    private $clients = array();
+    /**
+     * @var $steams MemoryStream[]
+     */
+    protected $steams = array();
 
     /**
      * @param \Icicle\Log\Log|null $log
      */
     public function __construct(Log $log = null)
     {
-        $this->log = $log ?: log();
-        $this->clients  = array();
-        $this->clientShare = shmop_open(1, 'c', 0644, 2048);
-        $this->services = array(
-            'chatService' => new ChatService()
-        );
-
-        var_dump($this->clientShare);
+        $this->log                     = $log ?: log();
+        $this->steams['chatService']   = new MemoryStream();
+        $this->services['chatService'] = new ChatService($this->steams['chatService']);
     }
+
     /**
      * {@inheritdoc}
      */
@@ -52,6 +52,7 @@ class ServicesDispatcher implements Application
         // Cookies may be set and returned on a new Response object, e.g.: return $response->withCookie(...);
         return $response;
     }
+
     /**
      * {@inheritdoc}
      */
@@ -64,21 +65,16 @@ class ServicesDispatcher implements Application
             $connection->getRemotePort()
         );
 
-        $this->clients[$this->getConnectionHash($connection)] = array('connection' => 'toto', 'user' => false);
-        shmop_write($this->clientShare, serialize($this->clients), 0);
-        yield $this->services['chatService']->testClassAttributeSync();
+        $this->clients[$this->getConnectionHash($connection)] = array('Connection' => $connection, 'User' => null);
         $iterator                                             = $connection->read()->getIterator();
 
-        // Add the user to the chat app or use a common base of users connected ...
-        // test if service can share class access attributes with sync
-
         while (yield $iterator->isValid()) {
-            /** @var \Icicle\WebSocket\Message $message */
-            $message = $iterator->getCurrent();
-            yield $this->serviceSelector(json_decode($message->getData(), true), $connection);
+            yield $this->serviceSelector(
+                json_decode($iterator->getCurrent()->getData(), true),
+                $this->clients[$this->getConnectionHash($connection)]
+            );
         }
-        /** @var \Icicle\WebSocket\Close $close */
-        $close = $iterator->getReturn(); // Only needs to be called if the close reason is needed.
+
         yield $this->log->log(
             Log::INFO,
             'WebSocket connection from %s:%d closed; Code %d; Data: %s',
@@ -89,35 +85,6 @@ class ServicesDispatcher implements Application
         );
     }
 
-    private function serviceSelector(array $data, Connection $connection)
-    {
-        yield $this->log->log(Log::INFO, 'Data: %s', $this->formatVariable($data));
-
-        switch ($data['service']) {
-            case 'server':
-                $this->serverAction($data, $connection);
-                break;
-
-            case 'chatService':
-                $this->services['chatService']->process($data, $connection);
-                break;
-
-            default:
-        }
-    }
-
-    private function serverAction(array $data, Connection $connection)
-    {
-        switch ($data['action']) {
-            case 'register':
-                $this->clients[$this->getConnectionHash($connection)]['user'] = new User($data['user']);
-                yield $this->log->log(Log::INFO, 'Data: %s', $this->formatVariable($this->clients));
-                break;
-
-            default:
-        }
-    }
-
     /**
      * Get the connection hash like a Connecton ID
      *
@@ -125,8 +92,35 @@ class ServicesDispatcher implements Application
      *
      * @return     string The connection hash
      */
-    private function getConnectionHash(Connection $connection): string
+    protected function getConnectionHash(Connection $connection): string
     {
         return md5($connection->getRemoteAddress() + $connection->getRemotePort());
+    }
+
+    private function serviceSelector(array $data, array $user)
+    {
+        yield $this->log->log(Log::INFO, 'Data: %s', $this->formatVariable($data));
+
+        switch ($data['service']) {
+            case 'server':
+                $this->serverAction($data, $user);
+                break;
+
+            case 'chatService':
+                $this->services['chatService']->process($data, $user);
+                break;
+        }
+    }
+
+    private function serverAction(array $data, array $user)
+    {
+        switch ($data['action']) {
+            case 'register':
+                yield $this->log->log(Log::INFO, 'Data: %s', $this->formatVariable($this->clients));
+                $this->clients[$this->getConnectionHash($user['Connection'])]['User'] = new User($data['user']);
+                break;
+
+            default:
+        }
     }
 }

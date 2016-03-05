@@ -4,8 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "7cf0e4942742f29612a48c72d7e7d811",
-    "content-hash": "486b31e7d015abf8e3751ceb887e3cb4",
+    "hash": "7e10148230fff965e272e7ce2e79237b",
+    "content-hash": "554bd70420d972e4d9d5e858d53d0459",
     "packages": [
         {
             "name": "daverandom/libdns",
@@ -194,70 +194,6 @@
                 "stream"
             ],
             "time": "2015-01-22 00:01:34"
-        },
-        {
-            "name": "icicleio/concurrent",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/icicleio/concurrent.git",
-                "reference": "74e9e76fe6ac64418e23ab0e86bab13c6969f4a7"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/icicleio/concurrent/zipball/74e9e76fe6ac64418e23ab0e86bab13c6969f4a7",
-                "reference": "74e9e76fe6ac64418e23ab0e86bab13c6969f4a7",
-                "shasum": ""
-            },
-            "require": {
-                "icicleio/icicle": "^2.0",
-                "icicleio/stream": "^2.0"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^5.0"
-            },
-            "suggest": {
-                "ext-pcntl": "Required for fork contexts",
-                "ext-pthreads": "Required for thread contexts",
-                "ext-sysvsem": "Required for fork synchronization",
-                "ext-sysvshm": "Required for fork contexts"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "2.0.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Icicle\\Concurrent\\": "src"
-                },
-                "files": [
-                    "src/Worker/functions.php"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Aaron Piotrowski",
-                    "email": "aaron@icicle.io"
-                },
-                {
-                    "name": "Stephen Coakley",
-                    "email": "me@stephencoakley.com"
-                }
-            ],
-            "description": "Concurrency component for Icicle.",
-            "homepage": "http://icicle.io",
-            "keywords": [
-                "async",
-                "asynchronous",
-                "stream"
-            ],
-            "time": "2016-02-22 05:07:31"
         },
         {
             "name": "icicleio/dns",
