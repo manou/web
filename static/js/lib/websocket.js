@@ -120,6 +120,7 @@ define([
          */
         treatData: function (data) {
             data = JSON.parse(data);
+            console.log(data);
 
             if (data.service && this.callbacks[data.service]) {
                 this.callbacks[data.service].callback.call(

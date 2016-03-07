@@ -17,8 +17,8 @@ interface ServiceInterface
     /**
      * Method to recieves data from the WebSocket server
      *
-     * @param      array       $data        JSON decoded client data
-     * @param      Connection  $connection  The user Connection object
+     * @param      array  $data    JSON decoded client data
+     * @param      array  $client  The client information [Connection, User] array pair
      */
-    public function process(array $data, Connection $connection);
+    public function process(array $data, array $client);
 }

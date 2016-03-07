@@ -77,11 +77,9 @@ class ServicesDispatcher implements Application
 
         yield $this->log->log(
             Log::INFO,
-            'WebSocket connection from %s:%d closed; Code %d; Data: %s',
+            'WebSocket connection from %s:%d closed',
             $connection->getRemoteAddress(),
-            $connection->getRemotePort(),
-            $close->getCode(),
-            $close->getData()
+            $connection->getRemotePort()
         );
     }
 
@@ -97,27 +95,30 @@ class ServicesDispatcher implements Application
         return md5($connection->getRemoteAddress() + $connection->getRemotePort());
     }
 
-    private function serviceSelector(array $data, array $user)
+    private function serviceSelector(array $data, array $client)
     {
         yield $this->log->log(Log::INFO, 'Data: %s', $this->formatVariable($data));
 
-        switch ($data['service']) {
-            case 'server':
-                $this->serverAction($data, $user);
-                break;
+        foreach ($data['service'] as $service) {
+            switch ($service) {
+                case 'server':
+                    yield $this->serverAction($data, $client);
+                    break;
 
-            case 'chatService':
-                $this->services['chatService']->process($data, $user);
-                break;
+                case 'chatService':
+                    // yield $client['Connection']->send('{"test": "toto"}');
+                    yield $this->services['chatService']->process($data, $client);
+                    break;
+            }
         }
     }
 
-    private function serverAction(array $data, array $user)
+    private function serverAction(array $data, array $client)
     {
         switch ($data['action']) {
             case 'register':
                 yield $this->log->log(Log::INFO, 'Data: %s', $this->formatVariable($this->clients));
-                $this->clients[$this->getConnectionHash($user['Connection'])]['User'] = new User($data['user']);
+                $this->clients[$this->getConnectionHash($client['Connection'])]['User'] = new User($data['user']);
                 break;
 
             default:
